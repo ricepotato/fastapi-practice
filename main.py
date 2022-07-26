@@ -1,7 +1,10 @@
-from typing import Union
+from datetime import datetime, time, timedelta
 from enum import Enum
-from fastapi import FastAPI, Query, Path, Body
-from pydantic import BaseModel, Field
+from typing import Union
+from uuid import UUID
+
+from fastapi import Body, Cookie, FastAPI, Path, Query, Header
+from pydantic import BaseModel, Field, HttpUrl
 
 
 class Item(BaseModel):
@@ -148,6 +151,83 @@ async def update_item(
     return results
 
 
+class Shot(BaseModel):
+    name: str
+    thumbnail_url: HttpUrl
+    image_url: HttpUrl
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "name": "A schema example",
+                "thumbnail_url": "https://ricepotato.bitbucket.io/schema/thumbnail",
+                "image_url": "https://ricepotato.bitbucket.io/schema/image",
+            }
+        }
+
+
+@app.post("/shots")
+async def create_shots(
+    shot: Shot = Body(
+        examples={
+            "normal": {
+                "summary": "a normal example",
+                "description": "a **normal** item works correctly",
+                "value": {
+                    "name": "A normal example",
+                    "thumbnail_url": "https://ricepotato.bitbucket.io/normal/thumbnail",
+                    "image_url": "https://ricepotato.bitbucket.io/normal/image",
+                },
+            },
+            "converted": {
+                "summary": "a converted example",
+                "description": "a **converted** item works correctly",
+                "value": {
+                    "name": "A converted example",
+                    "thumbnail_url": "https://ricepotato.bitbucket.io/converted/thumbnail",
+                    "image_url": "https://ricepotato.bitbucket.io/converted/image",
+                },
+            },
+            "invalid": {
+                "summary": "a invalid example",
+                "description": "a **invalid** item works correctly",
+                "value": {
+                    "name": "A invalid example",
+                    "thumbnail_url": "https://ricepotato.bitbucket.io/invalid/thumbnail",
+                    "image_url": "https://ricepotato.bitbucket.io/invalid/image",
+                },
+            },
+        }
+    )
+):
+    return shot
+
+
+class ShotV2(BaseModel):
+    item_id: UUID
+
+
+@app.put("/shots/{shot_id}")
+async def update_shots(
+    shot_id: UUID = Path(example="f902674b-0526-4a35-884a-b2eb809bd7ab"),
+    start_datetime: datetime | None = Body(default=None),
+    end_datetime: datetime | None = Body(default=None),
+    repeat_at: time | None = Body(default=None),
+    process_after: timedelta | None = Body(default=None),
+):
+    start_process = start_datetime + process_after
+    duration = end_datetime - start_process
+    return {
+        "shot_id": shot_id,
+        "start_datetime": start_datetime,
+        "end_datetime": end_datetime,
+        "repeat_at": repeat_at,
+        "process_after": process_after,
+        "start_process": start_process,
+        "duration": duration,
+    }
+
+
 fake_items_db = [{"item_name": "Foo"}, {"item_name": "Bar"}, {"item_name": "Baz"}]
 
 
@@ -162,7 +242,7 @@ async def read_user_me():
 
 
 @app.get("/users/{user_id}/items/{item_id}")
-async def read_user_item(
+async def read_user_item2(
     user_id: int,
     item_id: str,
     q: Union[str, None] = Query(default=None, min_length=3, max_length=50),
@@ -202,3 +282,11 @@ async def read_file(file_path: str):
 @app.post("/index-weights/")
 async def create_index_weights(weights: dict[int, float]):
     return weights
+
+
+@app.get("/header")
+async def get_header(
+    user_agent: Union[str, None] = Header(default=None),
+    api_key: Union[str, None] = Header(default=None),
+):
+    return {"User-Agent": user_agent, "api-key": api_key}
