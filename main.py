@@ -12,6 +12,16 @@ class Item(BaseModel):
     price: float = Field(gt=0, description="The price must be greater than zero")
     tax: Union[float, None] = None
 
+    class Config:
+        schema_extra = {
+            "example": {
+                "name": "Foo",
+                "description": "A very nice Item",
+                "price": 35.4,
+                "tax": 3.2,
+            }
+        }
+
 
 app = FastAPI()
 
@@ -187,3 +197,8 @@ async def get_model(model_name: ModelName):
 @app.get("/files/{file_path:path}")
 async def read_file(file_path: str):
     return {"file_path": file_path}
+
+
+@app.post("/index-weights/")
+async def create_index_weights(weights: dict[int, float]):
+    return weights
