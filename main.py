@@ -1,13 +1,15 @@
 from typing import Union
 from enum import Enum
-from fastapi import FastAPI
-from pydantic import BaseModel
+from fastapi import FastAPI, Query, Path, Body
+from pydantic import BaseModel, Field
 
 
 class Item(BaseModel):
     name: str
-    description: Union[str, None] = None
-    price: float
+    description: Union[str, None] = Field(
+        default=None, title="The description of the item", max_length=300
+    )
+    price: float = Field(gt=0, description="The price must be greater than zero")
     tax: Union[float, None] = None
 
 
@@ -18,6 +20,11 @@ class ModelName(str, Enum):
     alexnet = "alexnet"
     resnet = "resnet"
     lenet = "lenet"
+
+
+class User(BaseModel):
+    username: str
+    full_name: str | None = None
 
 
 @app.post("/items")
@@ -74,12 +81,12 @@ async def create_item(item: Item):
     return item
 
 
-@app.put("/items/{item_id}")
-async def put_item(item_id: int, item: Item, q: str | None = None):
-    result = {"item_id": item_id, **item.dict()}
-    if q:
-        result.update({"q": q})
-    return result
+# @app.put("/items/{item_id}")
+# async def put_item(item_id: int, item: Item, q: str | None = None):
+#     result = {"item_id": item_id, **item.dict()}
+#     if q:
+#         result.update({"q": q})
+#     return result
 
 
 @app.get("/")
@@ -88,7 +95,12 @@ async def root():
 
 
 @app.get("/items/{item_id}")
-async def read_item(item_id: int, q: Union[str, None] = None, short: bool = False):
+async def read_item(
+    item_id: int = Path(title="The ID of the item to get", default=..., gt=0, le=1000),
+    q: Union[str, None] = None,
+    size: Union[float, None] = Query(ge=-10, lt=10.5, default=None),
+    short: bool = False,
+):
     item = {"item_id": item_id}
     if q:
         item.update({"q": q})
@@ -103,6 +115,27 @@ async def read_item(item_id: int, q: Union[str, None] = None, short: bool = Fals
 async def read_user_item(shot_id: str, needy: str):
     item = {"shot_id": shot_id, "needy": needy}
     return item
+
+
+@app.put("/items/{item_id}")
+async def update_item(
+    *,
+    item_id: int = Path(title="The ID of the item to get", ge=0, le=1000),
+    q: str | None = None,
+    item: Item | None = None,
+    user: User | None = None,
+    importance: int = Body(default=...)
+):
+    results = {"item_id": item_id}
+    if q:
+        results.update({"q": q})
+    if item:
+        results.update({"item": item})
+    if user:
+        results.update({"user": user})
+    if importance:
+        results.update({"importance": importance})
+    return results
 
 
 fake_items_db = [{"item_name": "Foo"}, {"item_name": "Bar"}, {"item_name": "Baz"}]
@@ -120,7 +153,10 @@ async def read_user_me():
 
 @app.get("/users/{user_id}/items/{item_id}")
 async def read_user_item(
-    user_id: int, item_id: str, q: Union[str, None] = None, short: bool = False
+    user_id: int,
+    item_id: str,
+    q: Union[str, None] = Query(default=None, min_length=3, max_length=50),
+    short: bool = False,
 ):
     item = {"item_id": item_id, "owner_id": user_id}
     if q:
